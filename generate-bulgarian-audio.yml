@@ -1,0 +1,72 @@
+name: Generate Bulgarian dictionary audio
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "index.html"
+      - ".github/workflows/generate-bulgarian-audio.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  generate-audio:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install text-to-speech generator
+        run: pip install edge-tts
+
+      - name: Generate Bulgarian MP3 files
+        shell: bash
+        run: |
+          python - <<'PY'
+          import subprocess
+          from pathlib import Path
+
+          words = ["Здравей", "Благодаря", "Да", "Не", "Вкусно", "Планина", "Хубаво", "Довиждане", "Моля", "Извинете", "Вода", "Тоалетна", "Колко струва", "Добро утро", "Лека нощ", "Обичам те", "Сладолед", "Едно", "Две", "Три", "Четири", "Пет", "Гладен", "Помощ"]
+          audio_dir = Path("audio")
+          audio_dir.mkdir(exist_ok=True)
+
+          for i, text in enumerate(words):
+              out = audio_dir / f"bg-{i:02d}.mp3"
+              if out.exists() and out.stat().st_size > 1000:
+                  print("Already exists:", out)
+                  continue
+
+              print("Generating:", text, "->", out)
+              subprocess.run(
+                  [
+                      "edge-tts",
+                      "--voice", "bg-BG-KalinaNeural",
+                      "--rate=-8%",
+                      "--text", text,
+                      "--write-media", str(out),
+                  ],
+                  check=True,
+              )
+          PY
+
+      - name: Commit generated audio
+        shell: bash
+        run: |
+          if git status --porcelain audio/ | grep -q .; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add audio/
+            git commit -m "Add Bulgarian dictionary audio"
+            git push
+          else
+            echo "No new audio files to commit."
+          fi
